@@ -1,3 +1,0 @@
-digraph List {
-rankdir = LR;
-node [shape = record];
