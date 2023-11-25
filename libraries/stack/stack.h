@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <cstdint>
 
-extern FILE *Global_logs_pointer;
-extern bool  Global_color_output;
+extern FILE *Global_logs_pointer_tree;
+extern bool  Global_color_output_tree;
 
 #define STACK_CONSTRUCTOR(stk)                                                          \
 do {                                                                                    \

@@ -31,11 +31,11 @@
 
     #define COLOR_PRINT(color, str, ...)                                        \
      do {                                                                       \
-        if(Global_color_output)                                                 \
-            fprintf(Global_logs_pointer, color str RESET_COLOR, __VA_ARGS__);   \
+        if(Global_color_output_tree)                                                 \
+            fprintf(Global_logs_pointer_tree, color str RESET_COLOR, __VA_ARGS__);   \
                                                                                 \
         else                                                                    \
-            fprintf(Global_logs_pointer, str, __VA_ARGS__);                     \
+            fprintf(Global_logs_pointer_tree, str, __VA_ARGS__);                     \
                                                                                 \
     }  while(0)
 
@@ -43,9 +43,9 @@
 
     #define COLOR_PRINT(color, str, ...)                                                    \
      do {                                                                                   \
-        if(Global_color_output) fprintf(Global_logs_pointer, "<font color=" #color ">");    \
-        fprintf(Global_logs_pointer, str, __VA_ARGS__);                                     \
-        if(Global_color_output) fprintf(Global_logs_pointer, "</font>");                    \
+        if(Global_color_output_tree) fprintf(Global_logs_pointer_tree, "<font color=" #color ">");    \
+        fprintf(Global_logs_pointer_tree, str, __VA_ARGS__);                                     \
+        if(Global_color_output_tree) fprintf(Global_logs_pointer_tree, "</font>");                    \
     }  while(0)
 
 #endif
