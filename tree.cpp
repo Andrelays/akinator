@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include <ctype.h>
 #include "libraries/utilities/myassert.h"
 #include "libraries/utilities/colors.h"
@@ -16,34 +17,13 @@ bool  Global_color_output_tree  = true;
 
 const char *POISON_TREE = "Неизвестно кто";
 
-#ifdef DEBUG_OUTPUT_TREE_DUMP
-
-    #define IF_ON_TREE_DUMP(...)   __VA_ARGS__
-
-#else
-
-    #define IF_ON_TREE_DUMP(...)
-
-#endif
-
 static void printing_element_definition (stack *stk, tree_node *current_node);
 static ssize_t verify_tree (tree *tree_pointer, ssize_t line, const char *file, const char *func);
 static tree_node *new_tree_node();
 static void delete_subtree(tree_node *tree_node_pointer);
-static bool find_path_to_elememnt(tree *tree_pointer, stack *stk, const char *name_desired_element);
+static bool find_path_to_element(tree *tree_pointer, stack *stk, const char *name_desired_element);
 static bool rec_element_search(stack *stk, tree_node *current_node, const char *name_desired_element);
-static void saving_node_from_database(const char *database_buffer, tree_node *current_tree_node);
-
-IF_ON_TREE_DUMP
-(
-    static void tree_dump               (tree *tree_pointer, ssize_t line, const char *file, const char *func);
-    static void print_errors            (const tree *tree_pointer);
-    static void print_debug_info        (const tree *tree_pointer, ssize_t line, const char *file, const char *func);
-    static void generate_graph_of_tree  (tree *tree_pointer, ssize_t line, const char *file, const char *func);
-    static void write_log_to_dot        (const tree *tree_pointer, FILE *dot_file, ssize_t line, const char *file, const char *func);
-    static void write_subtree_to_dot    (const tree_node *tree_node_pointer, FILE *dot_file);
-    static void generate_image          (const tree *tree_pointer, const char *name_dot_file, ssize_t number_graph);
-)
+static tree_node *saving_node_from_database(char *database_buffer);
 
 #define VERIFY_TREE(tree_pointer) verify_tree(tree_pointer, __LINE__, __FILE__, __PRETTY_FUNCTION__)
 
@@ -143,7 +123,7 @@ tree_node **guess_answer(tree *tree_pointer)
 
     while ((*storage_location_node)->left != NULL)
     {
-        printf("Это %s?\n", (*storage_location_node)->data);
+        print_and_say("Это %s?\n", (*storage_location_node)->data);
 
         if (check_answer_to_question()) {
             storage_location_node = &((*storage_location_node)->left);
@@ -175,7 +155,7 @@ bool check_answer_to_question()
     {
         memset(answer, 0, SIZE_ANSWER);
 
-        fgets_whithout_newline(answer, MAX_SIZE_NAME_ELEMENT, stdin);
+        fgets_whithout_newline(answer, SIZE_ANSWER, stdin);
 
         if (strcmp(answer, "да") == 0) {
             return true;
@@ -185,7 +165,7 @@ bool check_answer_to_question()
             return false;
         }
 
-        printf("Ошибка! Был дан неправильный ответ. Введите его ещё раз (принимается только \"да\" или \"нет\"):\n");
+        print_and_say("Ошибка! Был дан неправильный ответ. Введите его ещё раз (принимается только \"да\" или \"нет\", возражения не принимаются):\n");
     }
 }
 
@@ -202,8 +182,6 @@ ssize_t inserting_new_element(tree *tree_pointer, tree_node **storage_location_n
 
     CHECK_ERRORS(tree_pointer);
 
-    printf("%s\n", (*storage_location_node)->data);
-
     tree_node *replaceable_node          = *storage_location_node;
     tree_node *new_element_node          = new_tree_node();
     tree_node *distinctive_property_node = new_tree_node();
@@ -218,8 +196,6 @@ ssize_t inserting_new_element(tree *tree_pointer, tree_node **storage_location_n
     distinctive_property_node->right = replaceable_node;
 
     *storage_location_node = distinctive_property_node;
-
-    printf("%s\n", tree_pointer->root->data);
 
     tree_pointer->size += 2;
 
@@ -242,7 +218,7 @@ void find_difference_between_elements(tree *tree_pointer, const char *name_compa
     STACK_CONSTRUCTOR(stk_element_1);
     STACK_CONSTRUCTOR(stk_element_2);
 
-    if (!find_path_to_elememnt(tree_pointer, stk_element_1, name_compared_element_1) || !find_path_to_elememnt(tree_pointer, stk_element_2, name_compared_element_2))
+    if (!find_path_to_element(tree_pointer, stk_element_1, name_compared_element_1) || !find_path_to_element(tree_pointer, stk_element_2, name_compared_element_2))
     {
         stack_destructor(stk_element_1);
         stack_destructor(stk_element_2);
@@ -253,7 +229,7 @@ void find_difference_between_elements(tree *tree_pointer, const char *name_compa
     tree_node *current_node_element_1 = tree_pointer->root;
     tree_node *current_node_element_2 = tree_pointer->root;
 
-    printf("%s и %s вместе - ", name_compared_element_1, name_compared_element_2);
+    print_and_say("%s и %s вместе - ", name_compared_element_1, name_compared_element_2);
 
     while (stk_element_1->size > 0 && stk_element_2->size > 0)
     {
@@ -263,14 +239,19 @@ void find_difference_between_elements(tree *tree_pointer, const char *name_compa
         if (pop_value_1 != pop_value_2)
         {
             push(stk_element_1, pop_value_1);
+            print_and_say("\nНо %s -", name_compared_element_1);
+            printing_element_definition(stk_element_1, current_node_element_1);
+
             push(stk_element_2, pop_value_2);
+            print_and_say("А %s - ", name_compared_element_2);
+            printing_element_definition(stk_element_2, current_node_element_2);
 
             break;
         }
 
         if (pop_value_1 == LEFT)
         {
-            printf("%s ", current_node_element_1->data);
+            print_and_say("%s ", current_node_element_1->data);
 
             current_node_element_1 = current_node_element_1->left;
             current_node_element_2 = current_node_element_2->left;
@@ -278,24 +259,18 @@ void find_difference_between_elements(tree *tree_pointer, const char *name_compa
 
         else
         {
-            printf("НЕ %s ", current_node_element_1->data);
+            print_and_say("НЕ %s ", current_node_element_1->data);
 
             current_node_element_1 = current_node_element_1->right;
-            current_node_element_2 = current_node_element_2->left;
+            current_node_element_2 = current_node_element_2->right;
         }
     }
-
-    printf("\nНо %s - ", name_compared_element_1);
-    printing_element_definition(stk_element_1, current_node_element_1);
-
-    printf("А %s - ", name_compared_element_2);
-    printing_element_definition(stk_element_2, current_node_element_2);
 
     stack_destructor(stk_element_1);
     stack_destructor(stk_element_2);
 }
 
-void define_element(tree *tree_pointer, const char *name_desired_element)
+void give_definition_element(tree *tree_pointer, const char *name_desired_element)
 {
     MYASSERT(tree_pointer            != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
     MYASSERT(tree_pointer->root      != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
@@ -305,13 +280,13 @@ void define_element(tree *tree_pointer, const char *name_desired_element)
     stack *stk = get_pointer_stack();
     STACK_CONSTRUCTOR(stk);
 
-    if (!find_path_to_elememnt(tree_pointer, stk, name_desired_element))
+    if (!find_path_to_element(tree_pointer, stk, name_desired_element))
     {
         stack_destructor(stk);
         return;
     }
 
-    printf("%s - ", name_desired_element);
+    print_and_say("%s - ", name_desired_element);
 
     printing_element_definition(stk, tree_pointer->root);
 
@@ -327,12 +302,12 @@ static void printing_element_definition(stack *stk, tree_node *current_node)
         pop(stk, &pop_value);
 
         if (pop_value == LEFT) {
-            printf("%s ", current_node->data);
+            print_and_say("%s ", current_node->data);
             current_node = current_node->left;
         }
 
         else {
-            printf("НЕ %s ", current_node->data);
+            print_and_say("НЕ %s ", current_node->data);
             current_node = current_node->right;
         }
     }
@@ -340,7 +315,7 @@ static void printing_element_definition(stack *stk, tree_node *current_node)
     putchar('\n');
 }
 
-static bool find_path_to_elememnt(tree *tree_pointer, stack *stk, const char *name_desired_element)
+static bool find_path_to_element(tree *tree_pointer, stack *stk, const char *name_desired_element)
 {
     MYASSERT(tree_pointer            != NULL, NULL_POINTER_PASSED_TO_FUNC, return false);
     MYASSERT(tree_pointer->root      != NULL, NULL_POINTER_PASSED_TO_FUNC, return false);
@@ -348,10 +323,9 @@ static bool find_path_to_elememnt(tree *tree_pointer, stack *stk, const char *na
     MYASSERT(name_desired_element    != NULL, NULL_POINTER_PASSED_TO_FUNC, return false);
     MYASSERT(stk                     != NULL, NULL_POINTER_PASSED_TO_FUNC, return false);
 
-
     if (!rec_element_search(stk, tree_pointer->root, name_desired_element))
     {
-        printf("Элемент \"%s\" не был найден!\n", name_desired_element);
+        print_and_say("Сам ты \"%s\"\n", name_desired_element);
         return false;
     }
 
@@ -367,7 +341,7 @@ static bool rec_element_search(stack *stk, tree_node *current_node, const char *
         return false;
     }
 
-    if (strcmp(current_node->data, name_desired_element) == 0) {
+    if (strcmp(current_node->data, name_desired_element) == 0 && !current_node->left && !current_node->right) {
         return true;
     }
 
@@ -384,61 +358,87 @@ static bool rec_element_search(stack *stk, tree_node *current_node, const char *
     return false;
 }
 
-// void saving_tree_from_database(FILE *database_file, tree *tree_pointer)
-// {
-//     size_t size_file = determine_size(database_file);
+void saving_tree_from_database(FILE *database_file, tree *tree_pointer)
+{
+    size_t size_file = determine_size(database_file);
+
+    char *database_buffer = (char *)calloc(size_file + 1, sizeof(char));
+
+    MYASSERT(database_buffer != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
+
+    size_file = fread(database_buffer, sizeof(char), size_file, database_file);
+    database_buffer[size_file] = '\0';
+
+    delete_subtree(tree_pointer->root);
+
+    tree_pointer->root = saving_node_from_database(database_buffer);
+
+    // free(database_buffer);
+
+    VERIFY_TREE(tree_pointer);
+
+    return;
+}
+
+static tree_node *saving_node_from_database(char *database_buffer)
+{
+    static char *current_buffer = NULL;
+
+    if (database_buffer == NULL) {
+        current_buffer = strtok(NULL, " \n\r\t");
+    }
+
+    else {
+        database_buffer = strtok(database_buffer, " \n\r\t");
+        current_buffer  = database_buffer;
+    }
+
+    if (current_buffer == NULL) {
+        print_and_say("Ошибка при считывании дерева из файла\n");
+        return NULL;
+    }
+
+//     else {
+//         strcat(current_tree_node->data, current_buffer);
 //
-//     char *database_buffer = (char *)calloc(size_file + 1, sizeof(char));
+//         current_buffer = strtok(NULL, " \n\r\t");
 //
-//     MYASSERT(database_buffer != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-//
-//     size_file = fread(database_buffer, sizeof(char), size_file, database_file);
-//     database_buffer[size_file] = '\0';
-//
-//     saving_node_from_database(database_buffer, tree_pointer->root);
-//
-//     free(database_buffer);
-//
-//     VERIFY_TREE(tree_pointer);
-//
-//     return;
-// }
-//
-// static void saving_node_from_database(const char *database_buffer, tree_node *current_tree_node)
-// {
-//     MYASSERT(database_buffer != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-//
-//     char data_element[MAX_SIZE_NAME_ELEMENT] = "";
-//
-//     while(*database_buffer != '\0')
-//     {
-//         database_buffer = skip_spaces(database_buffer);
-//
-//         if (*database_buffer == '\0') {
-//             return;
-//         }
-//
-//         if (*database_buffer == '(')
-//         {
-//             ++database_buffer;
-//
-//             tree_node *new_element_node = new_tree_node();
-//             saving_node_from_database(database_buffer, new_element_node);
-//
-//             return;
-//         }
-//
-//         if (strncmp(database_buffer, "nil", sizeof("nil") - 1) == 0) {
-//             database_buffer += 3;
-//         }
-//
-//         else {
-//             sscanf(database_buffer, "%s", data_element);
-//
-//             strncpy(current_tree_node->data, data_element, MAX_SIZE_NAME_ELEMENT);
+//         if (current_buffer == NULL) {
+//             print_and_say("Ошибка при считывании дерева из файла\n");
+//             return NULL;
 //         }
 //     }
-// }
+
+    if (*current_buffer == '(')
+    {
+        current_buffer = strtok(NULL, " \n\r\t");
+
+        if (current_buffer == NULL) {
+            print_and_say("Ошибка при считывании дерева из файла\n");
+            return NULL;
+        }
+
+        tree_node *current_tree_node = new_tree_node();
+
+        strncpy(current_tree_node->data, current_buffer, MAX_SIZE_NAME_ELEMENT);
+
+        current_tree_node->left  = saving_node_from_database(NULL);
+        current_tree_node->right = saving_node_from_database(NULL);
+
+        return current_tree_node;
+    }
+
+    if (strncmp(current_buffer, "nil", sizeof("nil") - 1) == 0) {
+        return NULL;
+    }
+
+    if (*current_buffer == ')') {
+        return saving_node_from_database(NULL);
+    }
+
+    return NULL;
+}
+
 
 void print_node(tree_node *tree_node_pointer, FILE *file_output)
 {
@@ -455,7 +455,7 @@ void print_node(tree_node *tree_node_pointer, FILE *file_output)
     print_node(tree_node_pointer->left,  file_output);
     print_node(tree_node_pointer->right, file_output);
 
-    fputc(')', file_output);
+    fprintf(file_output, ") ");
 }
 
 static ssize_t verify_tree(tree *tree_pointer, ssize_t line, const char *file, const char *func)
@@ -488,168 +488,37 @@ static ssize_t verify_tree(tree *tree_pointer, ssize_t line, const char *file, c
     return tree_pointer->error_code;
 }
 
-IF_ON_TREE_DUMP
-(
-    static void tree_dump(tree *tree_pointer, ssize_t line, const char *file, const char *func)
+#ifdef ON_MODE_SAY
+    int print_and_say(const char *fmt, ...)
     {
-        MYASSERT(tree_pointer               != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->root         != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->info         != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(Global_logs_pointer_tree   != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(file                       != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(func                       != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
+        va_list args_1, args_2;
+        va_start(args_1, fmt);
+        va_start(args_2, fmt);
 
-        print_errors(tree_pointer);
+        FILE *file_output = popen("festival --language russian --tts", "w");
 
-        print_debug_info(tree_pointer, line, file, func);
+        int ret = vprintf(fmt, args_2);
+        vfprintf(file_output, fmt, args_1);
 
-        generate_graph_of_tree(tree_pointer, line, file, func);
+        pclose(file_output);
+
+        va_end(args_1);
+        va_end(args_2);
+
+        return ret;
     }
-)
 
-IF_ON_TREE_DUMP
-(
-    static void print_debug_info(const tree *tree_pointer, ssize_t line, const char *file, const char *func)
+#else
+    int print_and_say(const char *fmt, ...)
     {
-        MYASSERT(tree_pointer               != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->root         != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->info         != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(Global_logs_pointer_tree   != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(file                       != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(func                       != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
+        va_list args;
+        va_start(args, fmt);
 
-        COLOR_PRINT(MediumBlue, "tree[%p]\n", tree_pointer);
+        int ret = vprintf(fmt, args);
 
-        COLOR_PRINT(BlueViolet, "\"%s\"from %s(%ld) %s\n", tree_pointer->info->name, tree_pointer->info->file, tree_pointer->info->line, tree_pointer->info->func);
+        va_end(args);
 
-        COLOR_PRINT(DarkMagenta, "called from %s(%ld) %s\n", file, line, func);
-
-        fprintf(Global_logs_pointer_tree,  "\nroot = ");
-        COLOR_PRINT(Orange, "%p\n", tree_pointer->root);
-
-        fprintf(Global_logs_pointer_tree, "size = ");
-        COLOR_PRINT(Crimson, "%ld\n", tree_pointer->size);
+        return ret;
     }
-)
 
-#define GET_ERRORS_(error)                                                           \
-do {                                                                                 \
-    if(tree_pointer->error_code & error)                                             \
-        COLOR_PRINT(Red, "Errors: %s\n", #error);                                    \
-} while(0)
-
-IF_ON_TREE_DUMP
-(
-    static void print_errors(const tree *tree_pointer)
-    {
-        MYASSERT(tree_pointer          != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->root    != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->info    != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(Global_logs_pointer_tree   != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-
-
-    }
-)
-
-#undef GET_ERRORS_
-
-IF_ON_TREE_DUMP
-(
-    static void generate_graph_of_tree(tree *tree_pointer, ssize_t line, const char *file, const char *func)
-    {
-        MYASSERT(tree_pointer               != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->root         != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->info         != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(Global_logs_pointer_tree   != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(file                       != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(func                       != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-
-        const char  *NAME_DOT_FILE   = "tree.dot";
-        static ssize_t number_graph = 0;
-
-        ++number_graph;
-
-        FILE *dot_file = check_isopen(NAME_DOT_FILE, "w");
-
-        write_log_to_dot(tree_pointer, dot_file, line, file, func);
-
-        MYASSERT(check_isclose(dot_file), COULD_NOT_CLOSE_THE_FILE , return);
-
-        generate_image(tree_pointer, NAME_DOT_FILE, number_graph);
-
-        fprintf(Global_logs_pointer_tree, "<img src = graph/tree_%ld.png height= 75%% width = 75%%>\n\n", number_graph);
-    }
-)
-
-IF_ON_TREE_DUMP
-(
-    static void write_log_to_dot(const tree *tree_pointer, FILE *dot_file, ssize_t line, const char *file, const char *func)
-    {
-        MYASSERT(tree_pointer           != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->root     != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->info     != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(dot_file               != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(file                   != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(func                   != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-
-        fprintf(dot_file,   "digraph Tree {\n"
-                            "\trankdir = TB;\n"
-	                        "\tnode [shape = record];\n"
-                            "\tsplines=ortho;\n");
-
-
-        fprintf(dot_file,  "\tsubgraph cluster0 {\n"
-                           "\t\tlabel = \"called  from:    %s(%ld)  %s\";\n", file, line, func);
-
-        write_subtree_to_dot(tree_pointer->root, dot_file);
-
-        fprintf(dot_file,   "\n\n\t\tInfo[shape = Mrecord, label = \"size = %ld \"];\n"
-                            "\t}\n"
-                            "}\n",
-                tree_pointer->size);
-    }
-)
-
-IF_ON_TREE_DUMP
-(
-    static void write_subtree_to_dot(const tree_node *tree_node_pointer, FILE *dot_file)
-    {
-        MYASSERT(tree_node_pointer      != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(dot_file               != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-
-        fprintf(dot_file,  "\t\tnode_%p  [shape = Mrecord, style = filled, fillcolor = \"#ba7fa2\", label = \"{" FORMAT_SPECIFIERS_TREE "| {<left> да | <right> нет}} \"];\n", tree_node_pointer, tree_node_pointer->data);
-
-        if (tree_node_pointer->left != NULL)
-        {
-            write_subtree_to_dot(tree_node_pointer->left, dot_file);
-
-            fprintf(dot_file, "\n\tnode_%p:<left> -> node_%p \t[color = blue];\n", tree_node_pointer, tree_node_pointer->left);
-        }
-
-        if (tree_node_pointer->right != NULL)
-        {
-            write_subtree_to_dot(tree_node_pointer->right, dot_file);
-
-            fprintf(dot_file, "\n\tnode_%p:<right> -> node_%p \t[color = blue];\n", tree_node_pointer, tree_node_pointer->right);
-        }
-    }
-)
-
-IF_ON_TREE_DUMP
-(
-    static void generate_image(const tree *tree_pointer, const char *name_dot_file, ssize_t number_graph)
-    {
-        MYASSERT(tree_pointer           != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->root     != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(tree_pointer->info     != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-        MYASSERT(name_dot_file          != NULL, NULL_POINTER_PASSED_TO_FUNC, return);
-
-        const size_t SIZE_NAME_GRAPH = 50;
-
-        char image_generation_command[SIZE_NAME_GRAPH] = "";
-
-        snprintf(image_generation_command, SIZE_NAME_GRAPH, "dot %s -T png -o graph/tree_%ld.png", name_dot_file, number_graph);
-
-        MYASSERT(!system(image_generation_command), SYSTEM_ERROR, return);
-    }
-)
+#endif
